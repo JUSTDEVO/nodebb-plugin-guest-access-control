@@ -25,12 +25,12 @@ window.$ = window.$ || ((selector) => document.querySelector(selector))
 
 window.config = window.config || { relative_path: "" }
 
-window.define("admin/plugins/guest-access-control", ["settings", "alerts"], (Settings, alerts) => {
+window.define("admin/plugins/guest-access-control", ["settings", "api"], (Settings, api) => {
   var ACP = {}
 
   ACP.init = () => {
     Settings.load("guest-access-control", window.$(".guest-access-control-settings"), () => {
-      console.log("[v0] Settings loaded successfully")
+      console.log("[guest-access-control] Settings loaded")
     })
 
     window.$("#save").on("click", () => {
@@ -51,10 +51,10 @@ window.define("admin/plugins/guest-access-control", ["settings", "alerts"], (Set
   function saveSettings() {
     Settings.save("guest-access-control", window.$(".guest-access-control-settings"), (err) => {
       if (err) {
-        alerts.error("Ayarlar kaydedilirken hata oluştu.")
+        window.alert("Ayarlar kaydedilirken hata oluştu.")
         return
       }
-      alerts.success("Ayarlar başarıyla kaydedildi!")
+      window.alert("Ayarlar başarıyla kaydedildi!")
       loadAnalytics()
     })
   }
@@ -69,7 +69,7 @@ window.define("admin/plugins/guest-access-control", ["settings", "alerts"], (Set
         window.$("#stat-reset").text(data.lastReset || "N/A")
       },
       error: () => {
-        console.error("Failed to load analytics")
+        console.error("[guest-access-control] Failed to load analytics")
       },
     })
   }
@@ -84,12 +84,12 @@ window.define("admin/plugins/guest-access-control", ["settings", "alerts"], (Set
       type: "POST",
       success: (response) => {
         if (response.success) {
-          alerts.success(response.message || "İstatistikler sıfırlandı!")
+          window.alert(response.message || "İstatistikler sıfırlandı!")
           loadAnalytics()
         }
       },
       error: () => {
-        alerts.error("İstatistikler sıfırlanırken bir hata oluştu.")
+        window.alert("İstatistikler sıfırlanırken hata oluştu.")
       },
     })
   }

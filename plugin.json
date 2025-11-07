@@ -1,14 +1,14 @@
 {
   "id": "nodebb-plugin-guest-access-control",
   "name": "Guest Access Control",
-  "description": "Advanced guest access control with forced registration, custom redirects, category protection, and visitor analytics",
+  "description": "Professional guest access control with forced registration and advanced security features",
   "url": "https://github.com/FORSTLAND/nodebb-plugin-guest-access-control",
   "library": "./library.js",
   "staticDirs": {
     "static": "./static"
   },
   "css": ["static/style.css"],
-  "scripts": ["static/admin.js"],
+  "less": [],
   "acpScripts": ["static/admin.js"],
   "hooks": [
     {
@@ -34,14 +34,6 @@
     {
       "hook": "filter:admin.header.build",
       "method": "addAdminNavigation"
-    },
-    {
-      "hook": "action:user.loggedIn",
-      "method": "onUserLogin"
-    },
-    {
-      "hook": "filter:homepage.get",
-      "method": "handleHomepageAccess"
     }
   ],
   "templates": "static/templates",

@@ -1,19 +1,16 @@
 const meta = require.main.require("./src/meta")
 const user = require.main.require("./src/user")
-const categories = require.main.require("./src/categories")
-const plugins = require.main.require("./src/plugins")
 const winston = require.main.require("winston")
 
 const plugin = {}
 
-// Default settings
 const defaultSettings = {
   enabled: "off",
   enableForceRegistration: "off",
   customMessage: "Bu forumu görüntülemek için kayıt olmanız gerekmektedir.",
   customTitle: "Kayıt Gerekli",
   redirectToRegister: "on",
-  whitelistedPaths: "/login,/register,/reset,/api,/assets,/plugins,/sounds,/language,/static",
+  whitelistedPaths: "/login,/register,/reset,/api/user,/assets,/plugins,/sounds,/language,/static",
   protectedCategories: "",
   showWelcomeMessage: "on",
   welcomeMessageTitle: "Hoş Geldiniz!",
@@ -27,7 +24,6 @@ const defaultSettings = {
   allowedGuestPages: "home,recent,popular,top",
 }
 
-// In-memory storage for analytics and rate limiting
 const analytics = {
   blockedAttempts: 0,
   uniqueVisitors: new Set(),
@@ -35,15 +31,16 @@ const analytics = {
 }
 
 const rateLimitStore = new Map()
+let settingsCache = null
+let cacheTime = 0
+const CACHE_DURATION = 60000 // 1 dakika cache
 
 plugin.init = async (params) => {
   const { router, middleware } = params
 
-  // Admin routes
+  // Admin panel routes
   router.get("/admin/plugins/guest-access-control", middleware.admin.buildHeader, renderAdmin)
   router.get("/api/admin/plugins/guest-access-control", renderAdmin)
-
-  // API endpoints for admin panel
   router.post("/api/admin/plugins/guest-access-control/save", middleware.admin.isAdmin, saveSettings)
   router.get("/api/admin/plugins/guest-access-control/analytics", middleware.admin.isAdmin, getAnalytics)
   router.post("/api/admin/plugins/guest-access-control/reset-analytics", middleware.admin.isAdmin, resetAnalytics)
@@ -52,24 +49,29 @@ plugin.init = async (params) => {
 }
 
 async function renderAdmin(req, res) {
-  const settings = await getSettings()
+  try {
+    const settings = await getSettings()
 
-  res.render("admin/plugins/guest-access-control", {
-    title: "Guest Access Control",
-    settings,
-    analytics: {
-      blockedAttempts: analytics.blockedAttempts,
-      uniqueVisitors: analytics.uniqueVisitors.size,
-      lastReset: new Date(analytics.lastReset).toLocaleString("tr-TR"),
-    },
-  })
+    res.render("admin/plugins/guest-access-control", {
+      title: "Guest Access Control",
+      settings: settings,
+      analytics: {
+        blockedAttempts: analytics.blockedAttempts,
+        uniqueVisitors: analytics.uniqueVisitors.size,
+        lastReset: new Date(analytics.lastReset).toLocaleString("tr-TR"),
+      },
+    })
+  } catch (error) {
+    winston.error("[plugin/guest-access-control] Error rendering admin:", error)
+    res.status(500).send("Error loading admin panel")
+  }
 }
 
 async function saveSettings(req, res) {
   try {
     const settings = req.body
 
-    // Validate and sanitize settings
+    // Input validation ve sanitization
     const validatedSettings = {
       enabled: settings.enabled === "on" ? "on" : "off",
       enableForceRegistration: settings.enableForceRegistration === "on" ? "on" : "off",
@@ -89,15 +91,19 @@ async function saveSettings(req, res) {
       ),
       enableAnalytics: settings.enableAnalytics === "on" ? "on" : "off",
       enableRateLimit: settings.enableRateLimit === "on" ? "on" : "off",
-      rateLimitRequests: Number.parseInt(settings.rateLimitRequests, 10) || 10,
-      rateLimitWindow: Number.parseInt(settings.rateLimitWindow, 10) || 60,
+      rateLimitRequests: String(Number.parseInt(settings.rateLimitRequests, 10) || 10),
+      rateLimitWindow: String(Number.parseInt(settings.rateLimitWindow, 10) || 60),
       customRedirectUrl: String(settings.customRedirectUrl || ""),
       blockApiAccess: settings.blockApiAccess === "on" ? "on" : "off",
       allowedGuestPages: String(settings.allowedGuestPages || defaultSettings.allowedGuestPages),
     }
 
-    // Save each setting
+    // NodeBB meta.settings kullanarak kaydet
     await meta.settings.set("guest-access-control", validatedSettings)
+
+    // Cache'i temizle
+    settingsCache = null
+    cacheTime = 0
 
     winston.info("[plugin/guest-access-control] Settings saved successfully")
     res.json({ success: true, message: "Ayarlar başarıyla kaydedildi!" })
@@ -109,8 +115,18 @@ async function saveSettings(req, res) {
 
 async function getSettings() {
   try {
+    const now = Date.now()
+
+    // Cache kontrolü
+    if (settingsCache && now - cacheTime < CACHE_DURATION) {
+      return settingsCache
+    }
+
     const settings = await meta.settings.get("guest-access-control")
-    return { ...defaultSettings, ...settings }
+    settingsCache = { ...defaultSettings, ...settings }
+    cacheTime = now
+
+    return settingsCache
   } catch (error) {
     winston.error("[plugin/guest-access-control] Error getting settings:", error)
     return defaultSettings
@@ -130,75 +146,78 @@ async function resetAnalytics(req, res) {
   analytics.uniqueVisitors.clear()
   analytics.lastReset = Date.now()
 
+  winston.info("[plugin/guest-access-control] Analytics reset")
   res.json({ success: true, message: "İstatistikler sıfırlandı!" })
 }
 
 plugin.checkGuestAccess = async (hookData) => {
   const { req, res } = hookData
 
-  // Check if user is logged in
-  if (req.uid > 0) {
+  // Kullanıcı giriş yapmışsa izin ver
+  if (req.uid && req.uid > 0) {
     return hookData
   }
 
   const settings = await getSettings()
 
-  // Check if plugin is enabled
+  // Plugin veya zorunlu kayıt kapalıysa izin ver
   if (settings.enabled !== "on" || settings.enableForceRegistration !== "on") {
     return hookData
   }
 
-  // Track unique visitor
+  // Analitik: Benzersiz ziyaretçi takibi
   if (settings.enableAnalytics === "on" && req.ip) {
     analytics.uniqueVisitors.add(req.ip)
   }
 
-  // Rate limiting
-  if (settings.enableRateLimit === "on") {
+  // Rate limiting kontrolü
+  if (settings.enableRateLimit === "on" && req.ip) {
     const isRateLimited = checkRateLimit(req.ip, settings)
     if (isRateLimited) {
       winston.warn(`[plugin/guest-access-control] Rate limit exceeded for IP: ${req.ip}`)
       if (res && res.status) {
-        return res.status(429).send("Çok fazla istek. Lütfen daha sonra tekrar deneyin.")
+        res.status(429).send("Çok fazla istek. Lütfen daha sonra tekrar deneyin.")
+        return hookData
       }
     }
   }
 
   const currentPath = req.path || req.url || ""
 
-  // Check if path is whitelisted
+  // Whitelist kontrolü
   if (isPathWhitelisted(currentPath, settings)) {
     return hookData
   }
 
-  // Check if it's an API request and API blocking is enabled
+  // API erişim kontrolü
   if (settings.blockApiAccess === "on" && currentPath.startsWith("/api/")) {
     if (!isPathWhitelisted(currentPath, settings)) {
       analytics.blockedAttempts++
-      winston.info(`[plugin/guest-access-control] Blocked API access attempt from guest: ${currentPath}`)
+      winston.info(`[plugin/guest-access-control] Blocked API access: ${currentPath}`)
 
       if (res && res.status) {
-        return res.status(403).json({
+        res.status(403).json({
           error: "Authentication required",
           message: "Bu API'ye erişmek için giriş yapmanız gerekiyor.",
         })
+        return hookData
       }
     }
   }
 
-  // Block access and redirect
+  // Erişimi engelle ve yönlendir
   analytics.blockedAttempts++
-  winston.info(`[plugin/guest-access-control] Blocked guest access attempt: ${currentPath}`)
+  winston.info(`[plugin/guest-access-control] Blocked guest access: ${currentPath}`)
 
   if (res && res.redirect) {
     const redirectUrl = settings.customRedirectUrl || (settings.redirectToRegister === "on" ? "/register" : "/login")
 
-    // Store original URL for redirect after login
+    // Orijinal URL'i session'a kaydet
     if (req.session) {
       req.session.returnTo = currentPath
     }
 
-    return res.redirect(redirectUrl)
+    res.redirect(redirectUrl)
   }
 
   return hookData
@@ -217,12 +236,11 @@ plugin.injectGuestMessage = async (hookData) => {
     return hookData
   }
 
-  // Inject welcome message into template data
+  // Template'e karşılama mesajı ekle
   templateData.guestWelcomeMessage = {
     enabled: true,
     title: settings.welcomeMessageTitle,
     content: settings.welcomeMessageContent,
-    customClass: "guest-access-control-banner",
   }
 
   return hookData
@@ -248,7 +266,7 @@ plugin.filterTopicForGuests = async (hookData) => {
 
   if (protectedCategoryIds.includes(topic.cid)) {
     hookData.topic = null
-    winston.info(`[plugin/guest-access-control] Blocked guest access to protected topic: ${topic.tid}`)
+    winston.info(`[plugin/guest-access-control] Blocked guest topic access: ${topic.tid}`)
   }
 
   return hookData
@@ -279,47 +297,6 @@ plugin.filterCategoriesForGuests = async (hookData) => {
   return hookData
 }
 
-plugin.handleHomepageAccess = async (hookData) => {
-  const { uid, data } = hookData
-
-  if (uid > 0) {
-    return hookData
-  }
-
-  const settings = await getSettings()
-
-  if (settings.enabled !== "on" || settings.enableForceRegistration !== "on") {
-    return hookData
-  }
-
-  // Allow certain homepage types for guests
-  const allowedPages = settings.allowedGuestPages.split(",").map((p) => p.trim())
-
-  if (!allowedPages.includes(data)) {
-    winston.info("[plugin/guest-access-control] Modified homepage access for guest")
-  }
-
-  return hookData
-}
-
-plugin.onUserLogin = async (hookData) => {
-  const { uid, req } = hookData
-
-  winston.info(`[plugin/guest-access-control] User ${uid} logged in successfully`)
-
-  // Redirect to originally requested page if stored in session
-  if (req.session && req.session.returnTo) {
-    const returnUrl = req.session.returnTo
-    delete req.session.returnTo
-
-    if (req.res && req.res.redirect) {
-      req.res.redirect(returnUrl)
-    }
-  }
-
-  return hookData
-}
-
 plugin.addAdminNavigation = async (header) => {
   header.plugins.push({
     route: "/plugins/guest-access-control",
@@ -330,7 +307,6 @@ plugin.addAdminNavigation = async (header) => {
   return header
 }
 
-// Helper functions
 function isPathWhitelisted(path, settings) {
   if (!path) {
     return false
@@ -356,7 +332,7 @@ function checkRateLimit(ip, settings) {
   }
 
   const now = Date.now()
-  const windowMs = settings.rateLimitWindow * 1000
+  const windowMs = Number.parseInt(settings.rateLimitWindow, 10) * 1000
   const maxRequests = Number.parseInt(settings.rateLimitRequests, 10)
 
   if (!rateLimitStore.has(ip)) {
@@ -374,14 +350,9 @@ function checkRateLimit(ip, settings) {
 
   record.count++
 
-  if (record.count > maxRequests) {
-    return true
-  }
-
-  return false
+  return record.count > maxRequests
 }
 
-// Cleanup old rate limit records every 5 minutes
 setInterval(
   () => {
     const now = Date.now()
