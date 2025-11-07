@@ -8,56 +8,66 @@
         <button class="btn btn-primary btn-sm" id="save">
           <i class="fa fa-save"></i> Kaydet
         </button>
+        <button class="btn btn-secondary btn-sm ms-2" id="reset">
+          <i class="fa fa-undo"></i> Sıfırla
+        </button>
       </div>
     </div>
   </div>
 
   <div class="row">
     <div class="col-12">
-      <div class="card mt-3">
-        <div class="card-header">
-          <h5 class="mb-0">Ana Ayarlar</h5>
-        </div>
-        <div class="card-body guest-access-control-settings">
-          <div class="mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="enabled" name="enabled" data-key="enabled" />
-              <label class="form-check-label" for="enabled">
-                Plugin'i Etkinleştir
-              </label>
+      <form class="guest-access-control-settings">
+        <div class="card mt-3">
+          <div class="card-header">
+            <h5 class="mb-0">Ana Ayarlar</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="form-check">
+                <!-- Checkbox için data-key yerine value kullanımı eklendi -->
+                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {{{ if enabled }}}checked{{{ end }}} />
+                <label class="form-check-label" for="enabled">
+                  Plugin'i Etkinleştir
+                </label>
+              </div>
+              <small class="form-text text-muted">Plugin'in tüm özelliklerini aktif eder</small>
             </div>
-            <small class="form-text text-muted">Plugin'in tüm özelliklerini aktif eder</small>
-          </div>
 
-          <div class="mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="forceRegistration" name="forceRegistration" data-key="forceRegistration" />
-              <label class="form-check-label" for="forceRegistration">
-                Zorunlu Kayıt Modu
-              </label>
+            <div class="mb-3">
+              <div class="form-check">
+                <!-- Checkbox için checked attribute eklendi -->
+                <input class="form-check-input" type="checkbox" id="forceRegistration" name="forceRegistration" {{{ if forceRegistration }}}checked{{{ end }}} />
+                <label class="form-check-label" for="forceRegistration">
+                  Zorunlu Kayıt Modu
+                </label>
+              </div>
+              <small class="form-text text-muted">Misafir kullanıcıları kayıt olmaya zorlar</small>
             </div>
-            <small class="form-text text-muted">Misafir kullanıcıları kayıt olmaya zorlar</small>
-          </div>
 
-          <div class="mb-3">
-            <label for="customMessage" class="form-label">Özel Mesaj</label>
-            <textarea class="form-control" id="customMessage" name="customMessage" data-key="customMessage" rows="3"></textarea>
-            <small class="form-text text-muted">Misafir kullanıcılara gösterilecek mesaj</small>
-          </div>
+            <div class="mb-3">
+              <label for="customMessage" class="form-label">Özel Mesaj</label>
+              <!-- Textarea için value attribute eklendi -->
+              <textarea class="form-control" id="customMessage" name="customMessage" rows="3">{customMessage}</textarea>
+              <small class="form-text text-muted">Misafir kullanıcılara gösterilecek mesaj</small>
+            </div>
 
-          <div class="mb-3">
-            <label for="redirectUrl" class="form-label">Yönlendirme URL</label>
-            <input type="text" class="form-control" id="redirectUrl" name="redirectUrl" data-key="redirectUrl" />
-            <small class="form-text text-muted">Misafir kullanıcıların yönlendirileceği sayfa (örn: /register)</small>
-          </div>
+            <div class="mb-3">
+              <label for="redirectUrl" class="form-label">Yönlendirme URL</label>
+              <!-- Input için value attribute eklendi -->
+              <input type="text" class="form-control" id="redirectUrl" name="redirectUrl" value="{redirectUrl}" />
+              <small class="form-text text-muted">Misafir kullanıcıların yönlendirileceği sayfa (örn: /register)</small>
+            </div>
 
-          <div class="mb-3">
-            <label for="whitelistedPaths" class="form-label">İzin Verilen Yollar</label>
-            <textarea class="form-control" id="whitelistedPaths" name="whitelistedPaths" data-key="whitelistedPaths" rows="3"></textarea>
-            <small class="form-text text-muted">Virgülle ayrılmış yollar (örn: /login,/register,/api)</small>
+            <div class="mb-3">
+              <label for="whitelistedPaths" class="form-label">İzin Verilen Yollar</label>
+              <!-- Textarea için value attribute eklendi -->
+              <textarea class="form-control" id="whitelistedPaths" name="whitelistedPaths" rows="3">{whitelistedPaths}</textarea>
+              <small class="form-text text-muted">Virgülle ayrılmış yollar (örn: /login,/register,/api)</small>
+            </div>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 </div>
