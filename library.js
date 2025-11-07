@@ -28,11 +28,12 @@ plugin.init = async (params) => {
 
 // Admin panel render
 async function renderAdmin(req, res) {
-  const settings = await getSettings()
+  const settings = await meta.settings.get("guest-access-control")
+  const finalSettings = Object.assign({}, defaultSettings, settings)
 
   res.render("admin/plugins/guest-access-control", {
     title: "Guest Access Control",
-    settings: settings,
+    ...finalSettings,
   })
 }
 
@@ -58,22 +59,6 @@ async function saveSettings(req, res) {
   }
 }
 
-// Ayarları getir
-async function getSettings() {
-  if (settingsCache) {
-    return settingsCache
-  }
-
-  try {
-    const settings = await meta.settings.get("guest-access-control")
-    settingsCache = Object.assign({}, defaultSettings, settings)
-    return settingsCache
-  } catch (error) {
-    winston.error("[plugin/guest-access-control] Get settings error:", error)
-    return defaultSettings
-  }
-}
-
 // Misafir erişim kontrolü
 plugin.checkGuestAccess = async (hookData) => {
   const { req, res } = hookData
@@ -83,17 +68,18 @@ plugin.checkGuestAccess = async (hookData) => {
     return hookData
   }
 
-  const settings = await getSettings()
+  const settings = await meta.settings.get("guest-access-control")
+  const finalSettings = Object.assign({}, defaultSettings, settings)
 
   // Plugin kapalıysa devam et
-  if (settings.enabled !== "on" || settings.forceRegistration !== "on") {
+  if (finalSettings.enabled !== "on" || finalSettings.forceRegistration !== "on") {
     return hookData
   }
 
   const currentPath = req.path || req.url || ""
 
   // Whitelist kontrolü
-  if (isPathWhitelisted(currentPath, settings)) {
+  if (isPathWhitelisted(currentPath, finalSettings)) {
     return hookData
   }
 
@@ -101,7 +87,7 @@ plugin.checkGuestAccess = async (hookData) => {
   winston.info("[plugin/guest-access-control] Redirecting guest from:", currentPath)
 
   if (res && typeof res.redirect === "function") {
-    res.redirect(settings.redirectUrl)
+    res.redirect(finalSettings.redirectUrl)
   }
 
   return hookData
