@@ -1,41 +1,28 @@
 {
   "id": "nodebb-plugin-guest-access-control",
   "name": "Guest Access Control",
-  "description": "Professional guest access control with forced registration and advanced security features",
+  "description": "Force guests to register before accessing the forum",
   "url": "https://github.com/FORSTLAND/nodebb-plugin-guest-access-control",
   "library": "./library.js",
   "staticDirs": {
     "static": "./static"
   },
   "css": ["static/style.css"],
-  "less": [],
   "acpScripts": ["static/admin.js"],
+  "templates": "./static/templates",
   "hooks": [
     {
       "hook": "static:app.load",
       "method": "init"
     },
     {
-      "hook": "filter:router.page",
-      "method": "checkGuestAccess"
-    },
-    {
       "hook": "filter:middleware.render",
-      "method": "injectGuestMessage"
-    },
-    {
-      "hook": "filter:topic.get",
-      "method": "filterTopicForGuests"
-    },
-    {
-      "hook": "filter:categories.get",
-      "method": "filterCategoriesForGuests"
+      "method": "checkGuestAccess"
     },
     {
       "hook": "filter:admin.header.build",
       "method": "addAdminNavigation"
     }
   ],
-  "templates": "static/templates",
   "compatibility": "^4.0.0"
 }

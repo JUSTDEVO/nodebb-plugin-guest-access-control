@@ -1,15 +1,14 @@
 {
   "name": "nodebb-plugin-guest-access-control",
   "version": "1.0.0",
-  "description": "Professional guest access control plugin for NodeBB with forced registration and advanced security features",
+  "description": "Guest access control plugin for NodeBB - Force registration for guests",
   "keywords": [
     "nodebb",
     "plugin",
     "guest",
     "access",
     "control",
-    "security",
-    "authentication"
+    "security"
   ],
   "homepage": "https://github.com/FORSTLAND/nodebb-plugin-guest-access-control#readme",
   "bugs": {
